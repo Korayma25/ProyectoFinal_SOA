@@ -40,6 +40,18 @@ button { border-radius: 11px; min-height: 43px; padding: 10px 14px; font-weight:
 .titulo-bloque { display: flex; align-items: center; gap: 10px; }
 .contador { background: #ecf2f8; color: #24506b; border-radius: 999px; font-weight: 800; font-size: 12px; padding: 7px 11px; }
 .vehiculos { display: grid; gap: 10px; }
+/* Listas de vehículos disponibles (02) y vendidos (05) con barra de desplazamiento propia */
+#vehiculos, #vehiculos-vendidos {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 6px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #9db8c6 #eef3f6;
+}
+#vehiculos::-webkit-scrollbar, #vehiculos-vendidos::-webkit-scrollbar { width: 8px; }
+#vehiculos::-webkit-scrollbar-track, #vehiculos-vendidos::-webkit-scrollbar-track { background: #eef3f6; border-radius: 999px; }
+#vehiculos::-webkit-scrollbar-thumb, #vehiculos-vendidos::-webkit-scrollbar-thumb { background: #9db8c6; border-radius: 999px; }
 .vacio { padding: 25px 10px; text-align: center; color: #7a8e9b; font-size: 13px; line-height: 1.5; }
 .vehiculo { border: 1px solid #dfe8ee; padding: 15px; border-radius: 13px; background: #fcfeff; }
 .vehiculo-cabecera { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
