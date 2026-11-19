@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#103b56" />
+    <meta name="description" content="Registro móvil de ventas de vehículos con inicio de sesión y autenticación JWT." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Ventas Móvil · PWA</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/main.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="encabezado">
+        <div class="logo" aria-hidden="true">🚙</div>
+        <div>
+          <p class="eyebrow">APLICACIÓN MÓVIL · PWA</p>
+          <h1>Registro de ventas</h1>
+          <p class="subtitulo">Cliente de las APIs de vehículos y ventas</p>
+        </div>
+      </header>
+
+      <main>
+        <!-- 01 · Inicio de sesión -->
+        <section class="panel" id="panel-login" aria-labelledby="titulo-acceso">
+          <div class="seccion-cabecera">
+            <span class="paso">01</span>
+            <h2 id="titulo-acceso">Iniciar sesión</h2>
+          </div>
+          <p class="ayuda">El JWT se obtiene con su usuario y contraseña (POST /oauth/token) y solo se conserva durante la sesión.</p>
+          <form id="form-login" novalidate>
+            <label for="usuario">Usuario</label>
+            <input id="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+            <label for="clave" class="espaciado">Contraseña</label>
+            <div class="fila-token">
+              <input id="clave" type="password" autocomplete="current-password" required />
+              <button id="alternarClave" type="button" class="boton-secundario" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button>
+            </div>
+            <div class="acciones">
+              <button id="entrar" class="boton-primario" type="submit">Iniciar sesión</button>
+            </div>
+          </form>
+          <div id="mensaje-login" class="mensaje neutro" role="status" aria-live="polite">Ingrese sus credenciales.</div>
+        </section>
+
+        <!-- Sesión activa -->
+        <div id="zona-venta" hidden>
+          <section class="panel sesion" aria-label="Sesión">
+            <span id="estado-sesion" class="estado disponible">Sesión activa</span>
+            <button id="salir" type="button" class="boton-discreto">Cerrar sesión</button>
+          </section>
+
+          <!-- 02 · Catálogo -->
+          <section class="panel listado" aria-labelledby="titulo-vehiculos">
+            <div class="seccion-cabecera resultados">
+              <div class="titulo-bloque"><span class="paso">02</span><h2 id="titulo-vehiculos">Vehículos</h2></div>
+              <span id="contador" class="contador">0 vehículos</span>
+            </div>
+            <div id="vehiculos" class="vehiculos">
+              <div class="vacio">Cargando vehículos…</div>
+            </div>
+          </section>
+
+          <!-- 03 · Venta -->
+          <section class="panel" aria-labelledby="titulo-venta">
+            <div class="seccion-cabecera">
+              <span class="paso">03</span>
+              <h2 id="titulo-venta">Registrar venta</h2>
+            </div>
+            <form id="form-venta" novalidate>
+              <label for="comprador">Comprador</label>
+              <select id="comprador" required>
+                <option value="">Cargando compradores…</option>
+              </select>
+              <div id="seleccion" class="seleccion">Seleccione un vehículo disponible del catálogo.</div>
+              <div class="acciones">
+                <button id="vender" class="boton-primario" type="submit" disabled>Registrar venta</button>
+              </div>
+            </form>
+            <div id="mensaje-venta" class="mensaje neutro" role="status" aria-live="polite">Aún no se ha registrado ninguna venta.</div>
+            <dl id="resultado" class="resultado" hidden></dl>
+          </section>
+
+          <!-- 04 · Consulta de estado -->
+          <section class="panel" aria-labelledby="titulo-consulta">
+            <div class="seccion-cabecera">
+              <span class="paso">04</span>
+              <h2 id="titulo-consulta">Consultar estado de una venta</h2>
+            </div>
+            <form id="form-consulta" novalidate>
+              <label for="venta-id">Identificador de la venta</label>
+              <div class="fila-token">
+                <input id="venta-id" type="number" inputmode="numeric" min="1" step="1" placeholder="Ej.: 16" />
+                <button id="consultar" type="submit" class="boton-secundario">Consultar</button>
+              </div>
+            </form>
+            <div id="mensaje-consulta" class="mensaje neutro" role="status" aria-live="polite">Use esta opción si la respuesta de la venta fue incierta.</div>
+          </section>
+        </div>
+      </main>
+      <footer><span id="conexion">Comprobando conexión…</span> · Datos proporcionados por las APIs REST</footer>
+    </div>
+  </body>
+</html>
