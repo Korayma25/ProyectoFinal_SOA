@@ -26,6 +26,8 @@ const formConsulta = $('#form-consulta');
 const campoVentaId = $('#venta-id');
 const mensajeConsulta = $('#mensaje-consulta');
 const conexion = $('#conexion');
+const contenedorVendidos = $('#vehiculos-vendidos');
+const contadorVendidos = $('#contador-vendidos');
 
 const moneda = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 
@@ -77,6 +79,7 @@ function cerrarSesion(aviso = 'Sesión cerrada.') {
   zonaVenta.hidden = true;
   panelLogin.hidden = false;
   contenedor.replaceChildren();
+  contenedorVendidos.replaceChildren();
   selectComprador.replaceChildren();
   resultado.hidden = true;
   mostrar(mensajeVenta, 'Aún no se ha registrado ninguna venta.');
@@ -131,6 +134,35 @@ function pintarVehiculos(vehiculos) {
 
 let vehiculosCargados = [];
 
+// ---- Vehículos vendidos (apartado 05): subconjunto del catálogo con estado VENDIDO ----
+function pintarVendidos(vehiculos) {
+  const vendidos = vehiculos.filter((v) => String(v.estado).toUpperCase() === 'VENDIDO');
+  contenedorVendidos.replaceChildren();
+  contadorVendidos.textContent = `${vendidos.length} vehículo${vendidos.length === 1 ? '' : 's'}`;
+  if (vendidos.length === 0) {
+    contenedorVendidos.append(crear('p', 'vacio', 'Aún no hay vehículos vendidos.'));
+    return;
+  }
+  for (const v of vendidos) {
+    const id = v.idVehiculo ?? v.id;
+    const tarjeta = crear('article', 'vehiculo');
+    const cabecera = crear('div', 'vehiculo-cabecera');
+    const titulo = crear('div');
+    titulo.append(crear('h3', 'vehiculo-titulo', `${texto(v.marca)} ${texto(v.modelo)}`), crear('span', 'vehiculo-id', `ID: ${texto(id)}`));
+    cabecera.append(titulo, crear('span', 'estado vendido', 'VENDIDO'));
+    const grilla = crear('div', 'datos');
+    for (const [etiqueta, valor, extra] of [
+      ['Placa', texto(v.placa)], ['Año', texto(v.anio)], ['Color', texto(v.color)], ['Precio', precio(v.precio), 'dato-precio'],
+    ]) {
+      const grupo = crear('div', extra || '');
+      grupo.append(crear('span', 'dato-etiqueta', etiqueta), crear('span', 'dato-valor', valor));
+      grilla.append(grupo);
+    }
+    tarjeta.append(cabecera, grilla);
+    contenedorVendidos.append(tarjeta);
+  }
+}
+
 function elegirVehiculo(v) {
   vehiculoElegido = v.idVehiculo ?? v.id;
   seleccion.textContent = `Vehículo seleccionado: ${texto(v.marca)} ${texto(v.modelo)} (ID ${vehiculoElegido}) · ${precio(v.precio)}`;
@@ -152,6 +184,7 @@ async function cargarCatalogo() {
       && String(v.estado).toUpperCase() === 'DISPONIBLE');
     if (!sigueDisponible) { vehiculoElegido = null; seleccion.textContent = 'Seleccione un vehículo disponible del catálogo.'; }
     pintarVehiculos(vehiculos);
+    pintarVendidos(vehiculos);
   } catch (error) {
     contenedor.replaceChildren(crear('p', 'vacio', 'No hay datos de vehículos disponibles.'));
     contador.textContent = '0 vehículos';
