@@ -1,0 +1,73 @@
+# ===== Dependencias y compilados =====
+node_modules/
+dist/
+build/
+target/
+bin/
+obj/
+out/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.class
+*.jar
+*.war
+
+# ===== Secretos y configuración local (publicar solo plantillas) =====
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+*.jks
+application-local.properties
+application-secret*.properties
+secrets.*
+!secrets.*.example
+
+# ===== Material de la actividad 3 y notas de sesión =====
+scripts-actividad3/
+NOTAS-SESION-APE04.md
+
+# ===== Documentos de Word (informes) =====
+*.docx
+*.doc
+*.dotx
+
+# ===== Registros y temporales =====
+*.log
+logs/
+*.tmp
+*.bak
+*.swp
+*~
+~$*
+.DS_Store
+Thumbs.db
+
+# ===== IDE y editores =====
+.vs/
+.vscode/
+.idea/
+*.iml
+*.suo
+*.user
+*.csproj.user
+.classpath
+.project
+.settings/
+
+# ===== Pruebas y cobertura =====
+coverage/
+htmlcov/
+.coverage
+TestResults/
+
+# ===== Archivos de Claude Code locales =====
+.claude/settings.local.json
