@@ -1,0 +1,14 @@
+#fastapi, permite trabajar con dependencias para API REST con Python 
+fastapi>=0.115,<1
+#Recibe las solicitudes HTTP que llegan al puerto configurado 
+#servicor llamado ASGI 
+uvicorn>=0.30,<1
+#Biblioteca ORM para trabajar con la base de datos desde python 
+SQLAlchemy>=2.0,<2.2
+PyMySQL[rsa]>=1.1,<2
+httpx>=0.28,<1
+pydantic>=2.9,<3
+python-dotenv>=1,<2
+#alembic
+#herramienta que administra los cambios en la estructura de la BD 
+alembic>=1.13,<2
