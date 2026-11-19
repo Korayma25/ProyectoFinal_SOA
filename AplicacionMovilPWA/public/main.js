@@ -1,6 +1,6 @@
 import {
   iniciarSesion, listarVehiculos, listarCompradores, registrarVenta, consultarVenta,
-  nuevaClaveIdempotencia,
+  nuevaClaveIdempotencia, rolDeJwt, funcionesDelRol,
 } from './api.js';
 
 // ---- Referencias a la interfaz ----
@@ -28,6 +28,26 @@ const mensajeConsulta = $('#mensaje-consulta');
 const conexion = $('#conexion');
 const contenedorVendidos = $('#vehiculos-vendidos');
 const contadorVendidos = $('#contador-vendidos');
+const panelVenta = $('#panel-venta');
+const panelConsulta = $('#panel-consulta');
+const etiquetaRol = $('#rol-sesion');
+const textoFunciones = $('#funciones-rol');
+
+// Funciones habilitadas según el rol de la sesión (solo presentación; el backend es quien autoriza).
+let permisos = funcionesDelRol('').permisos;
+let rolActual = '';
+
+function aplicarRol(jwt) {
+  rolActual = rolDeJwt(jwt);
+  const { permisos: p, etiquetas } = funcionesDelRol(rolActual);
+  permisos = p;
+  panelVenta.hidden = !p.has('registrarVenta');
+  panelConsulta.hidden = !p.has('consultarVenta');
+  etiquetaRol.textContent = `Rol: ${rolActual || 'DESCONOCIDO'}`;
+  etiquetaRol.hidden = false;
+  textoFunciones.textContent = `Funciones habilitadas: ${etiquetas.join(' · ')}.`;
+  textoFunciones.hidden = false;
+}
 
 const moneda = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 
@@ -62,6 +82,7 @@ function precio(valor) {
 // ---- Sesión ----
 function abrirSesion(jwt, expiraEn) {
   token = jwt;
+  aplicarRol(jwt);
   panelLogin.hidden = true;
   zonaVenta.hidden = false;
   clearTimeout(temporizadorSesion);
@@ -80,6 +101,8 @@ function cerrarSesion(aviso = 'Sesión cerrada.') {
   panelLogin.hidden = false;
   contenedor.replaceChildren();
   contenedorVendidos.replaceChildren();
+  etiquetaRol.hidden = true;
+  textoFunciones.hidden = true;
   selectComprador.replaceChildren();
   resultado.hidden = true;
   mostrar(mensajeVenta, 'Aún no se ha registrado ninguna venta.');
@@ -124,7 +147,7 @@ function pintarVehiculos(todos) {
     }
     tarjeta.append(cabecera, grilla);
 
-    if (disponible) {
+    if (disponible && permisos.has('registrarVenta')) {
       const boton = crear('button', 'boton-secundario seleccionar', vehiculoElegido === id ? 'Seleccionado' : 'Seleccionar para venta');
       boton.type = 'button';
       boton.addEventListener('click', () => elegirVehiculo(v));
@@ -294,7 +317,8 @@ formLogin.addEventListener('submit', async (evento) => {
     campoClave.value = '';              // la contraseña no se conserva
     mostrar(mensajeLogin, `HTTP ${sesion.codigoHttp}: sesión iniciada.`, 'exito');
     abrirSesion(sesion.token, sesion.expiraEn);
-    await Promise.all([cargarCatalogo(), cargarCompradores()]);
+    // Los compradores solo los pueden listar quienes registran ventas (CONSULTA recibiría 403).
+    await Promise.all([cargarCatalogo(), permisos.has('registrarVenta') ? cargarCompradores() : null]);
   } catch (error) {
     mostrar(mensajeLogin, error.message, 'error');
   } finally {

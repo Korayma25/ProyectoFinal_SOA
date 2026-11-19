@@ -53,8 +53,10 @@
         <div id="zona-venta" hidden>
           <section class="panel sesion" aria-label="Sesión">
             <span id="estado-sesion" class="estado disponible">Sesión activa</span>
+            <span id="rol-sesion" class="estado" hidden></span>
             <button id="salir" type="button" class="boton-discreto">Cerrar sesión</button>
           </section>
+          <p id="funciones-rol" class="ayuda" hidden></p>
 
           <!-- 02 · Catálogo -->
           <section class="panel listado" aria-labelledby="titulo-vehiculos">
@@ -68,7 +70,7 @@
           </section>
 
           <!-- 03 · Venta -->
-          <section class="panel" aria-labelledby="titulo-venta">
+          <section class="panel" id="panel-venta" aria-labelledby="titulo-venta">
             <div class="seccion-cabecera">
               <span class="paso">03</span>
               <h2 id="titulo-venta">Registrar venta</h2>
@@ -88,7 +90,7 @@
           </section>
 
           <!-- 04 · Consulta de estado -->
-          <section class="panel" aria-labelledby="titulo-consulta">
+          <section class="panel" id="panel-consulta" aria-labelledby="titulo-consulta">
             <div class="seccion-cabecera">
               <span class="paso">04</span>
               <h2 id="titulo-consulta">Consultar estado de una venta</h2>
