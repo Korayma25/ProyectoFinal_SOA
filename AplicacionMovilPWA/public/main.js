@@ -93,11 +93,13 @@ function manejarError(error, elemento) {
 }
 
 // ---- Catálogo ----
-function pintarVehiculos(vehiculos) {
+function pintarVehiculos(todos) {
+  // El catálogo solo muestra los disponibles; los vendidos van en el apartado 05.
+  const vehiculos = todos.filter((v) => String(v.estado).toUpperCase() === 'DISPONIBLE');
   contenedor.replaceChildren();
   contador.textContent = `${vehiculos.length} vehículo${vehiculos.length === 1 ? '' : 's'}`;
   if (vehiculos.length === 0) {
-    contenedor.append(crear('p', 'vacio', 'HTTP 200: no hay vehículos registrados.'));
+    contenedor.append(crear('p', 'vacio', 'No hay vehículos disponibles.'));
     return;
   }
   for (const v of vehiculos) {
