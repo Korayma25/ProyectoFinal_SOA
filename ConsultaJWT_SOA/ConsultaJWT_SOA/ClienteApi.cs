@@ -25,34 +25,25 @@ public sealed class ClienteApi
 
     private string _token = "";
 
-    /// <summary>Acepta el JWT solo o con el prefijo "Bearer ".</summary>
-    public void EstablecerToken(string entrada)
-    {
-        var t = (entrada ?? "").Trim();
-        if (t.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) t = t[7..].Trim();
-        _token = t;
-    }
-
-    public bool TieneToken => !string.IsNullOrWhiteSpace(_token);
-
-    /// <summary>POST /oauth/token. El cliente OAuth se toma de variables de entorno, nunca del código.</summary>
+    /// <summary>
+    /// POST /oauth/token. El usuario escribe solo usuario y contraseña; la aplicación agrega el cliente OAuth
+    /// leído de secrets.local.json (excluido de Git, ver ConfigLocal), nunca del código fuente.
+    /// </summary>
     public async Task<ResultadoApi<string>> IniciarSesionAsync(string usuario, string clave)
     {
-        var cliente = Environment.GetEnvironmentVariable("OAUTH_CLIENT_ID");
-        var secreto = Environment.GetEnvironmentVariable("OAUTH_CLIENT_SECRET");
-        if (string.IsNullOrWhiteSpace(cliente) || string.IsNullOrWhiteSpace(secreto))
-            return Fallo<string>(0, "Defina OAUTH_CLIENT_ID y OAUTH_CLIENT_SECRET, o pegue un JWT en el campo Token.");
+        var config = ConfigLocal.Cargar();
+        if (config is null)
+            return Fallo<string>(0, "Falta secrets.local.json junto a la aplicación (clientId, clientSecret, idapli).");
 
-        var idapli = Environment.GetEnvironmentVariable("OAUTH_IDAPLI") ?? "92";
         using var solicitud = new HttpRequestMessage(HttpMethod.Post, "oauth/token")
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["grant_type"] = "password", ["username"] = usuario, ["password"] = clave, ["idapli"] = idapli
+                ["grant_type"] = "password", ["username"] = usuario, ["password"] = clave, ["idapli"] = config.IdApli
             })
         };
         solicitud.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{cliente}:{secreto}")));
+            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{config.ClientId}:{config.ClientSecret}")));
 
         return await EnviarAsync<string>(solicitud, null, async (resp, cuerpo) =>
         {
@@ -64,6 +55,25 @@ public sealed class ClienteApi
             _token = token;
             return Ok((int)resp.StatusCode, token, "Sesión iniciada.");
         });
+    }
+
+    // ---- Roles (GET /api/identidad) ----
+    /// <summary>Roles del usuario autenticado, sin el prefijo "ROLE_" (CONSULTA, OPERADOR, ADMIN).</summary>
+    public IReadOnlyList<string> Roles { get; private set; } = Array.Empty<string>();
+
+    public bool EsAdmin => Roles.Contains("ADMIN");
+    /// <summary>Crear vehículos y compradores y listar compradores: OPERADOR o ADMIN.</summary>
+    public bool PuedeOperar => EsAdmin || Roles.Contains("OPERADOR");
+
+    /// <summary>Consulta los roles del usuario con el JWT ya emitido y los guarda en el cliente.</summary>
+    public async Task<ResultadoApi<string>> CargarRolesAsync()
+    {
+        var r = await Obtener<IdentidadUsuario>("api/identidad", "identidad");
+        if (!r.Exito || r.Datos is null) return Fallo<string>(r.CodigoHttp, r.Mensaje);
+        Roles = r.Datos.Roles
+            .Select(x => x.StartsWith("ROLE_", StringComparison.OrdinalIgnoreCase) ? x[5..] : x)
+            .Select(x => x.ToUpperInvariant()).ToList();
+        return Ok(r.CodigoHttp, string.Join(", ", Roles), "Identidad cargada.");
     }
 
     // ---- API Java (vehículos) ----
@@ -137,7 +147,7 @@ public sealed class ClienteApi
             if (token is not null)
             {
                 if (string.IsNullOrWhiteSpace(token))
-                    return Fallo<T>(401, "HTTP 401: no hay JWT. Inicie sesión o pegue el token.");
+                    return Fallo<T>(401, "HTTP 401: no hay sesión activa. Inicie sesión.");
                 solicitud.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             solicitud.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
