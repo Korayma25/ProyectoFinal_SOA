@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { listarVehiculos } from './api/vehiculosApi.js';
 import { iniciarSesion, rolDeJwt } from './api/autenticacionApi.js';
 import Ventas from './componentes/Ventas.jsx';
+import { funcionesDelRol, permisosDelRol } from './utils/permisos.js';
 import { filtrarPorMarca, idDe, marcasDe, soloDisponibles } from './utils/catalogo.js';
 import './App.css';
 
@@ -43,6 +44,8 @@ export default function App() {
   const visibles = filtrarPorMarca(disponibles, marca);
   const marcas = marcasDe(disponibles);
   const vendidosOcultos = vehiculos.length - disponibles.length;
+  // Paneles visibles según el rol del JWT (solo presentación; el backend autoriza).
+  const permisos = permisosDelRol(sesion?.rol);
   // El detalle solo se muestra si el vehículo seleccionado sigue visible con el filtro actual.
   const detalle = seleccionado && visibles.some((v) => idDe(v) === idDe(seleccionado))
     ? seleccionado
@@ -167,6 +170,9 @@ export default function App() {
             <span className="etiqueta etiqueta-ok">Sesión activa</span>
             <span className="etiqueta">Usuario: {sesion.usuario}</span>
             <span className="etiqueta">Rol: {sesion.rol || 'DESCONOCIDO'}</span>
+            <p className="ayuda" style={{ flexBasis: '100%', margin: 0 }}>
+              Funciones habilitadas: {funcionesDelRol(sesion.rol).join(' · ')}.
+            </p>
             <div className="acciones">
               <button type="button" disabled={cargando} onClick={() => consultarVehiculos(sesion.token)}>
                 {cargando ? 'Consultando...' : 'Consultar vehículos'}
@@ -366,7 +372,7 @@ export default function App() {
             )}
           </section>
 
-          <Ventas token={sesion.token} onSesionInvalida={sesionInvalida} />
+          {permisos.ventas && <Ventas token={sesion.token} onSesionInvalida={sesionInvalida} />}
         </>
       )}
     </main>
