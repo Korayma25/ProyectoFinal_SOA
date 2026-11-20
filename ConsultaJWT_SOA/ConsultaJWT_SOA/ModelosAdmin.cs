@@ -62,3 +62,10 @@ public sealed class PaginaVentas
     [JsonPropertyName("limit")] public int Limit { get; set; }
     [JsonPropertyName("offset")] public int Offset { get; set; }
 }
+
+/// <summary>Respuesta de GET /api/identidad.</summary>
+public sealed class IdentidadUsuario
+{
+    public string Usuario { get; set; } = "";
+    public List<string> Roles { get; set; } = new();
+}
