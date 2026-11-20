@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listarVehiculos } from './api/vehiculosApi.js';
 import { iniciarSesion, rolDeJwt } from './api/autenticacionApi.js';
+import { filtrarPorMarca, idDe, marcasDe, soloDisponibles } from './utils/catalogo.js';
 import './App.css';
 
 // Ecuador usa dólares estadounidenses. No modifica el precio de la API.
@@ -31,11 +32,20 @@ export default function App() {
   const [mensaje, setMensaje] = useState('Ingrese sus credenciales.');
   const [error, setError] = useState('');
   const [codigoHttp, setCodigoHttp] = useState(null);
+  // Estado propio del catálogo (carga, error y código HTTP de GET /api/vehiculos).
+  const [mensajeCatalogo, setMensajeCatalogo] = useState('');
+  const [errorCatalogo, setErrorCatalogo] = useState('');
+  const [codigoCatalogo, setCodigoCatalogo] = useState(null);
 
-  // El filtro se aplica a los vehículos ya recibidos; no consulta MySQL.
-  const visibles = vehiculos.filter((v) =>
-    String(v.marca ?? '').toLowerCase().includes(marca.trim().toLowerCase()),
-  );
+  // Catálogo para vender: solo vehículos DISPONIBLES. El filtro se aplica a los ya recibidos.
+  const disponibles = soloDisponibles(vehiculos);
+  const visibles = filtrarPorMarca(disponibles, marca);
+  const marcas = marcasDe(disponibles);
+  const vendidosOcultos = vehiculos.length - disponibles.length;
+  // El detalle solo se muestra si el vehículo seleccionado sigue visible con el filtro actual.
+  const detalle = seleccionado && visibles.some((v) => idDe(v) === idDe(seleccionado))
+    ? seleccionado
+    : null;
 
   // Cierra la sesión: borra el JWT y todos los datos mostrados.
   function cerrarSesion(aviso = 'Sesión cerrada.', conError = false) {
@@ -45,6 +55,9 @@ export default function App() {
     setVehiculos([]);
     setSeleccionado(null);
     setMarca('');
+    setMensajeCatalogo('');
+    setErrorCatalogo('');
+    setCodigoCatalogo(null);
     setCodigoHttp(null);
     setError(conError ? aviso : '');
     setMensaje(conError ? 'Inicie sesión de nuevo.' : aviso);
@@ -97,9 +110,9 @@ export default function App() {
   // Consulta GET /api/vehiculos con el JWT de la sesión.
   async function consultarVehiculos(token) {
     setCargando(true);
-    setError('');
-    setMensaje('Consultando la API de vehículos...');
-    setCodigoHttp(null);
+    setErrorCatalogo('');
+    setMensajeCatalogo('Consultando la API de vehículos...');
+    setCodigoCatalogo(null);
     setVehiculos([]); // Evita confundir una consulta fallida con datos antiguos.
     setSeleccionado(null);
 
@@ -107,18 +120,21 @@ export default function App() {
       // La conexión HTTP se realiza en otro archivo, no en la interfaz.
       const resultado = await listarVehiculos(token);
       setVehiculos(resultado.vehiculos);
-      setCodigoHttp(resultado.codigoHttp);
-      setMensaje(`Consulta correcta: ${resultado.vehiculos.length} vehículos.`);
+      setCodigoCatalogo(resultado.codigoHttp);
+      setMensajeCatalogo(
+        `Consulta correcta: ${resultado.vehiculos.length} vehículos recibidos, `
+        + `${soloDisponibles(resultado.vehiculos).length} disponibles.`,
+      );
     } catch (e) {
       if (e.status === 401) {
         // JWT vencido o inválido: se vuelve al login.
         cerrarSesion(e.message, true);
         return;
       }
-      // Errores 403 y de red quedan visibles para el usuario.
-      setCodigoHttp(e.status ?? null);
-      setError(e.message);
-      setMensaje('La consulta no pudo completarse.');
+      // Errores 403, 5xx y de red quedan visibles para el usuario.
+      setCodigoCatalogo(e.status ?? null);
+      setErrorCatalogo(e.message);
+      setMensajeCatalogo('La consulta no pudo completarse.');
     } finally {
       // Se ejecuta tanto cuando fetch tiene éxito como cuando falla.
       setCargando(false);
@@ -208,85 +224,141 @@ export default function App() {
 
       {sesion && (
         <>
-      <section className="panel" aria-labelledby="titulo-listado">
-        <div className="titulo-listado">
-          <div>
-            <h2 id="titulo-listado">2. Catálogo de vehículos</h2>
-            <p className="ayuda">Datos recibidos del backend; filtro ejecutado en el navegador.</p>
-          </div>
-          <span className="contador">{visibles.length} visibles</span>
-        </div>
+          <section className="panel" aria-labelledby="titulo-listado">
+            <div className="titulo-listado">
+              <div>
+                <h2 id="titulo-listado">2. Catálogo de vehículos disponibles</h2>
+                <p className="ayuda">
+                  Solo se muestran los vehículos DISPONIBLES para la venta; el filtro se ejecuta en el navegador.
+                </p>
+              </div>
+              <span className="contador">
+                {cargando ? 'Consultando...' : `${visibles.length} de ${disponibles.length} disponibles`}
+              </span>
+            </div>
 
-        <label htmlFor="filtroMarca">Filtrar por marca</label>
-        <input
-          id="filtroMarca"
-          type="search"
-          placeholder="Ejemplo: Toyota"
-          value={marca}
-          onChange={(e) => setMarca(e.target.value)}
-          disabled={cargando}
-        />
-
-        <div className="tabla-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">Marca</th>
-                <th scope="col">Modelo</th>
-                <th scope="col">Precio</th>
-                <th scope="col">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((v, indice) => (
-                <tr key={v.idVehiculo ?? v.id ?? indice}>
-                  <td>
-                    <button
-                      className="enlace-id"
-                      type="button"
-                      onClick={() => setSeleccionado(v)}
-                      aria-label={`Ver detalle del vehículo ${v.idVehiculo ?? v.id ?? ''}`}
-                    >
-                      {v.idVehiculo ?? v.id ?? '—'}
-                    </button>
-                  </td>
-                  <td>{v.marca ?? '—'}</td>
-                  <td>{v.modelo ?? '—'}</td>
-                  <td>{mostrarPrecio(v.precio)}</td>
-                  <td>{v.estado ?? '—'}</td>
-                </tr>
-              ))}
-              {visibles.length === 0 && (
-                <tr>
-                  <td className="sin-datos" colSpan="5">
-                    {cargando
-                      ? 'Cargando vehículos...'
-                      : vehiculos.length === 0
-                        ? 'Aún no hay vehículos para mostrar. Presione Consultar vehículos.'
-                        : 'No hay vehículos que coincidan con la marca.'}
-                  </td>
-                </tr>
+            <div
+              className={errorCatalogo ? 'estado estado-error' : 'estado estado-ok'}
+              role="status"
+              aria-live="polite"
+            >
+              <span>{errorCatalogo || mensajeCatalogo}</span>
+              {codigoCatalogo !== null && <strong>HTTP {codigoCatalogo}</strong>}
+              {errorCatalogo && (
+                <button
+                  className="secundario"
+                  type="button"
+                  disabled={cargando}
+                  onClick={() => consultarVehiculos(sesion.token)}
+                >
+                  Reintentar
+                </button>
               )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+            </div>
 
-      <section className="panel" aria-labelledby="titulo-detalle">
-        <h2 id="titulo-detalle">3. Detalle del vehículo</h2>
-        {seleccionado ? (
-          <dl className="detalle">
-            <div><dt>ID</dt><dd>{seleccionado.idVehiculo ?? seleccionado.id ?? '—'}</dd></div>
-            <div><dt>Marca</dt><dd>{seleccionado.marca ?? '—'}</dd></div>
-            <div><dt>Modelo</dt><dd>{seleccionado.modelo ?? '—'}</dd></div>
-            <div><dt>Precio</dt><dd>{mostrarPrecio(seleccionado.precio)}</dd></div>
-            <div><dt>Estado</dt><dd>{seleccionado.estado ?? '—'}</dd></div>
-          </dl>
-        ) : (
-          <p className="ayuda">Después de consultar, seleccione el ID de una fila para ver sus datos.</p>
-        )}
-      </section>
+            <label htmlFor="filtroMarca">Filtrar por marca</label>
+            <input
+              id="filtroMarca"
+              type="search"
+              list="marcas-disponibles"
+              placeholder="Ejemplo: Toyota"
+              value={marca}
+              onChange={(e) => setMarca(e.target.value)}
+              disabled={cargando}
+            />
+            <datalist id="marcas-disponibles">
+              {marcas.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            {vendidosOcultos > 0 && (
+              <p className="nota">
+                {vendidosOcultos} vehículo(s) vendido(s) u otro estado no se muestran en este catálogo.
+              </p>
+            )}
+
+            <div className="tabla-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Marca</th>
+                    <th scope="col">Modelo</th>
+                    <th scope="col">Año</th>
+                    <th scope="col">Precio</th>
+                    <th scope="col">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((v, indice) => {
+                    const id = idDe(v);
+                    const activo = detalle !== null && idDe(detalle) === id;
+                    return (
+                      <tr key={id ?? indice} className={activo ? 'fila-activa' : undefined}>
+                        <td>
+                          <button
+                            className="enlace-id"
+                            type="button"
+                            onClick={() => setSeleccionado(v)}
+                            aria-pressed={activo}
+                            aria-label={`Ver detalle del vehículo ${id ?? ''}`}
+                          >
+                            {id ?? '—'}
+                          </button>
+                        </td>
+                        <td>{v.marca ?? '—'}</td>
+                        <td>{v.modelo ?? '—'}</td>
+                        <td>{v.anio ?? '—'}</td>
+                        <td>{mostrarPrecio(v.precio)}</td>
+                        <td>{v.estado ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
+                  {visibles.length === 0 && (
+                    <tr>
+                      <td className="sin-datos" colSpan="6">
+                        {cargando
+                          ? 'Cargando vehículos...'
+                          : errorCatalogo
+                            ? 'No hay datos de vehículos para mostrar.'
+                            : vehiculos.length === 0
+                              ? 'La API no devolvió vehículos.'
+                              : disponibles.length === 0
+                                ? 'No hay vehículos disponibles para la venta.'
+                                : `No hay vehículos disponibles de la marca «${marca.trim()}».`}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="panel" aria-labelledby="titulo-detalle">
+            <h2 id="titulo-detalle">3. Detalle del vehículo</h2>
+            {detalle ? (
+              <>
+                <dl className="detalle">
+                  <div><dt>ID</dt><dd>{idDe(detalle) ?? '—'}</dd></div>
+                  <div><dt>Marca</dt><dd>{detalle.marca ?? '—'}</dd></div>
+                  <div><dt>Modelo</dt><dd>{detalle.modelo ?? '—'}</dd></div>
+                  <div><dt>Placa</dt><dd>{detalle.placa ?? '—'}</dd></div>
+                  <div><dt>Año</dt><dd>{detalle.anio ?? '—'}</dd></div>
+                  <div><dt>Color</dt><dd>{detalle.color ?? '—'}</dd></div>
+                  <div><dt>Chasis</dt><dd>{detalle.chasis ?? '—'}</dd></div>
+                  <div><dt>Precio</dt><dd>{mostrarPrecio(detalle.precio)}</dd></div>
+                  <div><dt>Estado</dt><dd>{detalle.estado ?? '—'}</dd></div>
+                </dl>
+                <div className="acciones">
+                  <button className="secundario" type="button" onClick={() => setSeleccionado(null)}>
+                    Cerrar detalle
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="ayuda">Seleccione el ID de una fila del catálogo para ver todos sus datos.</p>
+            )}
+          </section>
         </>
       )}
     </main>
