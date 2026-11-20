@@ -9,14 +9,11 @@ namespace ConsultaJWT_SOA;
 /// </summary>
 public sealed class FormAdministracion : Form
 {
-    private readonly ClienteApi _api = new();
+    private readonly ClienteApi _api;
+    private readonly string _usuario;
 
-    // Acceso
-    private readonly TextBox _txtToken = new() { Width = 300, UseSystemPasswordChar = true };
-    private readonly TextBox _txtUsuario = new() { Width = 120 };
-    private readonly TextBox _txtClave = new() { Width = 120, UseSystemPasswordChar = true };
-    private readonly Button _btnEntrar = new() { Text = "Iniciar sesión", AutoSize = true };
-    private readonly Button _btnUsarToken = new() { Text = "Usar token", AutoSize = true };
+    // Sesión
+    private readonly Button _btnSalir = new() { Text = "Cerrar sesión", AutoSize = true };
 
     // Vehículos
     private readonly TextBox _vMarca = new(), _vModelo = new(), _vPlaca = new(), _vChasis = new() { MaxLength = 17 }, _vColor = new();
@@ -42,8 +39,10 @@ public sealed class FormAdministracion : Form
     private readonly Label _lblEstado = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 8, 0) };
     private readonly List<Control> _controlesOperativos = new();
 
-    public FormAdministracion()
+    public FormAdministracion(ClienteApi api, string usuario)
     {
+        _api = api;
+        _usuario = usuario;
         Text = "Administración de vehículos y compradores";
         MinimumSize = new Size(900, 640);
         Size = new Size(1000, 700);
@@ -56,15 +55,17 @@ public sealed class FormAdministracion : Form
         raiz.Controls.Add(ConstruirAcceso(), 0, 0);
 
         var pestanas = new TabControl { Dock = DockStyle.Fill };
+        // Solo se construye lo que el rol puede usar:
+        //   CONSULTA: lista vehículos y consulta ventas.
+        //   OPERADOR / ADMIN: además crean vehículos y compradores y listan compradores.
         pestanas.TabPages.Add(ConstruirPestanaVehiculos());
-        pestanas.TabPages.Add(ConstruirPestanaCompradores());
+        if (_api.PuedeOperar) pestanas.TabPages.Add(ConstruirPestanaCompradores());
         pestanas.TabPages.Add(ConstruirPestanaVentas());
         raiz.Controls.Add(pestanas, 0, 1);
         raiz.Controls.Add(_lblEstado, 0, 2);
         Controls.Add(raiz);
 
-        _btnEntrar.Click += async (_, _) => await IniciarSesion();
-        _btnUsarToken.Click += (_, _) => UsarToken();
+        _btnSalir.Click += (_, _) => DialogResult = DialogResult.Retry;   // vuelve al login
         _btnCrearVehiculo.Click += async (_, _) => await CrearVehiculo();
         _btnListarVehiculos.Click += async (_, _) => await ListarVehiculos();
         _btnCrearComprador.Click += async (_, _) => await CrearComprador();
@@ -73,10 +74,18 @@ public sealed class FormAdministracion : Form
 
         _controlesOperativos.AddRange(new Control[]
         {
-            _btnEntrar, _btnUsarToken, _btnCrearVehiculo, _btnListarVehiculos,
+            _btnCrearVehiculo, _btnListarVehiculos,
             _btnCrearComprador, _btnListarCompradores, _btnListarVentas
         });
-        Mostrar("Inicie sesión o pegue un JWT para comenzar.");
+        Mostrar("Sesión iniciada. Cargando datos…");
+
+        // Al abrirse el panel se cargan las tres listas con la sesión ya autenticada.
+        Shown += async (_, _) =>
+        {
+            await ListarVehiculos();
+            if (_api.PuedeOperar) await ListarCompradores();
+            await ListarVentas();
+        };
     }
 
     // ---------- Construcción de la interfaz ----------
@@ -89,13 +98,9 @@ public sealed class FormAdministracion : Form
 
     private Control ConstruirAcceso()
     {
-        var caja = new GroupBox { Text = "Acceso (JWT)", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
+        var caja = new GroupBox { Text = "Sesión", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
         var fila = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
-        fila.Controls.AddRange(new Control[]
-        {
-            Etiqueta("Token:"), _txtToken, _btnUsarToken,
-            Etiqueta("   Usuario:"), _txtUsuario, Etiqueta("Contraseña:"), _txtClave, _btnEntrar
-        });
+        fila.Controls.AddRange(new Control[] { Etiqueta($"Usuario: {_usuario}   Rol: {string.Join(", ", _api.Roles)}"), _btnSalir });
         caja.Controls.Add(fila);
         return caja;
     }
@@ -126,6 +131,14 @@ public sealed class FormAdministracion : Form
         var acciones = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(6) };
         acciones.Controls.AddRange(new Control[] { _btnCrearVehiculo, _btnListarVehiculos, _lblTotalVehiculos });
         _lblTotalVehiculos.Margin = new Padding(12, 7, 0, 0);
+        // CONSULTA no ve el formulario ni el botón de crear: solo el listado.
+        if (!_api.PuedeOperar)
+        {
+            acciones.Controls.Remove(_btnCrearVehiculo);
+            pagina.Controls.Add(_gridVehiculos);
+            pagina.Controls.Add(acciones);
+            return pagina;
+        }
         pagina.Controls.Add(_gridVehiculos);
         pagina.Controls.Add(acciones);
         pagina.Controls.Add(formulario);
@@ -177,26 +190,15 @@ public sealed class FormAdministracion : Form
         }
     }
 
-    private void Resultado<T>(ResultadoApi<T> r) => Mostrar(r.Mensaje, !r.Exito);
-
-    // ---------- Acceso ----------
-    private void UsarToken()
+    // Un 401 significa que el JWT venció: se vuelve al login en lugar de pedir un token.
+    private void Resultado<T>(ResultadoApi<T> r)
     {
-        _api.EstablecerToken(_txtToken.Text);
-        if (!_api.TieneToken) { Mostrar("Pegue un JWT válido en el campo Token.", true); return; }
-        Mostrar("Token cargado. Ya puede operar; el servidor validará los permisos.");
-    }
-
-    private async Task IniciarSesion()
-    {
-        if (string.IsNullOrWhiteSpace(_txtUsuario.Text) || string.IsNullOrEmpty(_txtClave.Text))
-        { Mostrar("Usuario y contraseña son obligatorios.", true); return; }
-        await Ejecutar("Autenticando…", async () =>
+        Mostrar(r.Mensaje, !r.Exito);
+        if (!r.Exito && r.CodigoHttp == 401)
         {
-            var r = await _api.IniciarSesionAsync(_txtUsuario.Text.Trim(), _txtClave.Text);
-            if (r.Exito) { _txtToken.Text = r.Datos; _txtClave.Clear(); }
-            Resultado(r);
-        });
+            MessageBox.Show(this, "La sesión venció. Inicie sesión de nuevo.", "Sesión", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            DialogResult = DialogResult.Retry;
+        }
     }
 
     // ---------- Vehículos ----------
