@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listarVehiculos } from './api/vehiculosApi.js';
 import { iniciarSesion, rolDeJwt } from './api/autenticacionApi.js';
+import Ventas from './componentes/Ventas.jsx';
 import { filtrarPorMarca, idDe, marcasDe, soloDisponibles } from './utils/catalogo.js';
 import './App.css';
 
@@ -62,6 +63,11 @@ export default function App() {
     setError(conError ? aviso : '');
     setMensaje(conError ? 'Inicie sesión de nuevo.' : aviso);
   }
+
+  // Lo usa la consulta de ventas cuando el backend responde 401 (JWT vencido o inválido).
+  // Solo usa funciones de estado de React (estables), por eso puede memorizarse una sola vez.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sesionInvalida = useCallback((aviso) => cerrarSesion(aviso, true), []);
 
   // Cuando el JWT vence (expires_in), la sesión se cierra automáticamente.
   useEffect(() => {
@@ -359,6 +365,8 @@ export default function App() {
               <p className="ayuda">Seleccione el ID de una fila del catálogo para ver todos sus datos.</p>
             )}
           </section>
+
+          <Ventas token={sesion.token} onSesionInvalida={sesionInvalida} />
         </>
       )}
     </main>
