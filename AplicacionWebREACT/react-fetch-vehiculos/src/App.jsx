@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { listarVehiculos } from './api/vehiculosApi.js';
+import { iniciarSesion, rolDeJwt } from './api/autenticacionApi.js';
 import './App.css';
 
 // Ecuador usa dólares estadounidenses. No modifica el precio de la API.
@@ -17,13 +18,17 @@ function mostrarPrecio(precio) {
 
 export default function App() {
   // useState guarda datos de la pantalla. Cuando cambian, React la actualiza.
-  const [token, setToken] = useState('');
-  const [mostrarToken, setMostrarToken] = useState(false);
+  // La sesión (JWT, usuario y rol) vive solo en memoria: no se usa localStorage ni cookies.
+  const [sesion, setSesion] = useState(null);
+  const [usuario, setUsuario] = useState('');
+  const [clave, setClave] = useState('');
+  const [mostrarClave, setMostrarClave] = useState(false);
+  const [accediendo, setAccediendo] = useState(false);
   const [vehiculos, setVehiculos] = useState([]);
   const [marca, setMarca] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [mensaje, setMensaje] = useState('Listo para consultar.');
+  const [mensaje, setMensaje] = useState('Ingrese sus credenciales.');
   const [error, setError] = useState('');
   const [codigoHttp, setCodigoHttp] = useState(null);
 
@@ -32,9 +37,65 @@ export default function App() {
     String(v.marca ?? '').toLowerCase().includes(marca.trim().toLowerCase()),
   );
 
-  // Evento ejecutado al pulsar "Consultar vehículos".
-  async function consultarVehiculos(evento) {
+  // Cierra la sesión: borra el JWT y todos los datos mostrados.
+  function cerrarSesion(aviso = 'Sesión cerrada.', conError = false) {
+    setSesion(null);
+    setClave('');
+    setMostrarClave(false);
+    setVehiculos([]);
+    setSeleccionado(null);
+    setMarca('');
+    setCodigoHttp(null);
+    setError(conError ? aviso : '');
+    setMensaje(conError ? 'Inicie sesión de nuevo.' : aviso);
+  }
+
+  // Cuando el JWT vence (expires_in), la sesión se cierra automáticamente.
+  useEffect(() => {
+    if (!sesion?.expiraEn) return undefined;
+    const temporizador = setTimeout(
+      () => cerrarSesion('La sesión venció. Inicie sesión de nuevo.', true),
+      sesion.expiraEn * 1000,
+    );
+    return () => clearTimeout(temporizador);
+  }, [sesion]);
+
+  // Evento ejecutado al enviar el formulario de acceso.
+  async function acceder(evento) {
     evento.preventDefault(); // Evita que el navegador recargue la página.
+    const nombre = usuario.trim();
+    if (!nombre || !clave) {
+      setError('Usuario y contraseña son obligatorios.');
+      return;
+    }
+    setAccediendo(true);
+    setError('');
+    setCodigoHttp(null);
+    setMensaje('Autenticando...');
+    try {
+      const acceso = await iniciarSesion(nombre, clave);
+      setClave(''); // La contraseña no se conserva.
+      setSesion({
+        token: acceso.token,
+        usuario: nombre,
+        rol: rolDeJwt(acceso.token),
+        expiraEn: acceso.expiraEn,
+      });
+      setCodigoHttp(acceso.codigoHttp);
+      setMensaje('Sesión iniciada.');
+      await consultarVehiculos(acceso.token);
+    } catch (e) {
+      setClave('');
+      setCodigoHttp(e.status ?? null);
+      setError(e.message);
+      setMensaje('No se pudo iniciar sesión.');
+    } finally {
+      setAccediendo(false);
+    }
+  }
+
+  // Consulta GET /api/vehiculos con el JWT de la sesión.
+  async function consultarVehiculos(token) {
     setCargando(true);
     setError('');
     setMensaje('Consultando la API de vehículos...');
@@ -49,7 +110,12 @@ export default function App() {
       setCodigoHttp(resultado.codigoHttp);
       setMensaje(`Consulta correcta: ${resultado.vehiculos.length} vehículos.`);
     } catch (e) {
-      // Errores 401, 403 y red quedan visibles para el usuario.
+      if (e.status === 401) {
+        // JWT vencido o inválido: se vuelve al login.
+        cerrarSesion(e.message, true);
+        return;
+      }
+      // Errores 403 y de red quedan visibles para el usuario.
       setCodigoHttp(e.status ?? null);
       setError(e.message);
       setMensaje('La consulta no pudo completarse.');
@@ -68,51 +134,70 @@ export default function App() {
       </header>
 
       <section className="panel" aria-labelledby="titulo-acceso">
-        <h2 id="titulo-acceso">1. Conexión con la API</h2>
+        <h2 id="titulo-acceso">1. Acceso</h2>
         <p className="ayuda">
-          La aplicación consulta <code>GET /api/vehiculos</code> mediante el
-          proxy local hacia <code>127.0.0.1:8080</code>.
+          El JWT se obtiene con su usuario y contraseña (<code>POST /oauth/token</code>) mediante el
+          proxy local hacia NGINX (<code>127.0.0.1:8090</code>) y solo se conserva durante la sesión.
         </p>
 
-        <form onSubmit={consultarVehiculos}>
-          <label htmlFor="jwt">Token JWT de Postman (sin escribir Bearer)</label>
-          <div className="linea-token">
+        {sesion ? (
+          <div className="sesion">
+            <span className="etiqueta etiqueta-ok">Sesión activa</span>
+            <span className="etiqueta">Usuario: {sesion.usuario}</span>
+            <span className="etiqueta">Rol: {sesion.rol || 'DESCONOCIDO'}</span>
+            <div className="acciones">
+              <button type="button" disabled={cargando} onClick={() => consultarVehiculos(sesion.token)}>
+                {cargando ? 'Consultando...' : 'Consultar vehículos'}
+              </button>
+              <button
+                className="secundario"
+                type="button"
+                disabled={cargando}
+                onClick={() => cerrarSesion()}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={acceder}>
+            <label htmlFor="usuario">Usuario</label>
             <input
-              id="jwt"
-              type={mostrarToken ? 'text' : 'password'}
-              autoComplete="off"
+              id="usuario"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
               spellCheck="false"
-              placeholder="Pegar token JWT obtenido previamente"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
             />
-            <button
-              className="secundario"
-              type="button"
-              onClick={() => setMostrarToken((actual) => !actual)}
-              aria-label={mostrarToken ? 'Ocultar token' : 'Mostrar token'}
-            >
-              {mostrarToken ? 'Ocultar' : 'Mostrar'}
-            </button>
-          </div>
 
-          <div className="acciones">
-            <button type="submit" disabled={cargando}>
-              {cargando ? 'Consultando...' : 'Consultar vehículos'}
-            </button>
-            <button
-              className="secundario"
-              type="button"
-              disabled={cargando}
-              onClick={() => {
-                setToken('');
-                setMostrarToken(false);
-              }}
-            >
-              Limpiar token
-            </button>
-          </div>
-        </form>
+            <label htmlFor="clave">Contraseña</label>
+            <div className="linea-token">
+              <input
+                id="clave"
+                type={mostrarClave ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+              />
+              <button
+                className="secundario"
+                type="button"
+                onClick={() => setMostrarClave((actual) => !actual)}
+                aria-label={mostrarClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {mostrarClave ? 'Ocultar' : 'Mostrar'}
+              </button>
+            </div>
+
+            <div className="acciones">
+              <button type="submit" disabled={accediendo}>
+                {accediendo ? 'Autenticando...' : 'Iniciar sesión'}
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className={error ? 'estado estado-error' : 'estado estado-ok'} role="status" aria-live="polite">
           <span>{error || mensaje}</span>
@@ -121,6 +206,8 @@ export default function App() {
         <p className="nota">El JWT permanece en memoria: no se guarda en localStorage ni en archivos.</p>
       </section>
 
+      {sesion && (
+        <>
       <section className="panel" aria-labelledby="titulo-listado">
         <div className="titulo-listado">
           <div>
@@ -200,6 +287,8 @@ export default function App() {
           <p className="ayuda">Después de consultar, seleccione el ID de una fila para ver sus datos.</p>
         )}
       </section>
+        </>
+      )}
     </main>
   );
 }
