@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from decimal import Decimal
 
-import httpx
+from app.clients.publicador_eventos import construir_evento_venta, publicar_evento
 
 from sqlalchemy.exc import IntegrityError
 
@@ -18,7 +18,6 @@ from app.models import Venta, Comprador
 from app.repositories.venta_repository import VentaRepository
 from app.clients.vehiculos_client import VehiculosClient, FalloRemoto
 
-from app.config import NOTIF_URL, NOTIF_KEY
 from app.errors import ApiError
 from app.security import propietario
 
@@ -196,30 +195,12 @@ def procesar(id):
             v.error_detalle = "Pendiente de consultar y conciliar con Java"
 
 def notificar(id):
-
+    """Publica el evento de venta en RabbitMQ SOLO si la venta está COMPLETADA y aún no se publicó.
+    Venta rechazada o pendiente: no se publica. Reintento idempotente (ya ENVIADA): no repite el evento.
+    Si RabbitMQ no confirma, queda PENDIENTE y el worker lo reintenta con el mismo eventoId."""
     with SessionLocal.begin() as db:
-
         v = VentaRepository(db).bloquear(id)
-
         if v is None or v.estado != "COMPLETADA" or v.notificacion == "ENVIADA":
-
             return
-
-        try:
-
-            r = httpx.post(NOTIF_URL + "/api/notificaciones", timeout=3,
-
-                headers={"X-Notification-Key": NOTIF_KEY}, json={
-
-                    "vehiculoId": v.vehiculo_id, "tipo": "VENTA",
-
-                    "destinatario": v.comprador.correo,
-
-                    "mensaje": f"Venta {v.id} operación {v.operacion_id} completada",
-                })
-
-            v.notificacion = "ENVIADA" if 200 <= r.status_code < 300 else "PENDIENTE"
-
-        except httpx.RequestError:
-
-            v.notificacion = "PENDIENTE"
+        evento = construir_evento_venta(v.operacion_id, v.id, v.vehiculo_id, fecha_utc(v))
+        v.notificacion = "ENVIADA" if publicar_evento(evento) else "PENDIENTE"
