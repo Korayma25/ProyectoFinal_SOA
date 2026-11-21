@@ -43,6 +43,12 @@ def vendedor(usuario):
 
         raise ApiError(403, "SIN_PERMISO", "Se requiere OPERADOR o ADMIN")
 
+def ambito(usuario):
+    """Alcance de los listados: ADMIN ve los datos de todos (None = sin filtro por usuario);
+    OPERADOR solo ve lo suyo (su nombre de usuario)."""
+    return None if "ROLE_ADMIN" in usuario["roles"] else usuario["usuario"]
+
+
 def propietario(usuario, dueno):
 
     if usuario["usuario"] != dueno and "ROLE_ADMIN" not in usuario["roles"]:

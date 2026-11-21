@@ -34,7 +34,8 @@ class VentaRepository:
 
     def pagina_por_usuario(self, usuario, estado, limit, offset):
 
-        condiciones = [Venta.usuario == usuario]
+        # usuario=None (ADMIN): todas las ventas; con nombre: solo las de ese usuario.
+        condiciones = [] if usuario is None else [Venta.usuario == usuario]
 
         if estado is not None:
 
@@ -64,7 +65,7 @@ class VentaRepository:
                 (Venta.estado == "EN_REVISION", 1), else_=0)), 0),
             func.coalesce(func.sum(case(
                 (Venta.estado == "FALLIDA", 1), else_=0)), 0),
-        ).where(Venta.usuario == usuario)).one()
+        ).where(*([] if usuario is None else [Venta.usuario == usuario]))).one()
 
     def pendientes(self):
 

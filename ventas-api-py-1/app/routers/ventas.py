@@ -9,7 +9,7 @@ from app.schemas import (
     ActualizarComprador, ComprobanteVentaSalida, CompradorSalida,
     CrearComprador, CrearVenta, PaginaVentasSalida, ResumenVentasSalida,
 )
-from app.security import identidad, vendedor, propietario
+from app.security import ambito, identidad, vendedor, propietario
 from app.errors import ApiError
 from app.services import venta_service as service
 from app.repositories.venta_repository import VentaRepository
@@ -48,7 +48,9 @@ def listar_compradores(
 
     with SessionLocal() as db:
 
-        consulta = select(Comprador).where(Comprador.usuario == u["usuario"])
+        consulta = select(Comprador)
+        if ambito(u) is not None:  # OPERADOR: solo sus compradores; ADMIN: todos
+            consulta = consulta.where(Comprador.usuario == ambito(u))
 
         if buscar is not None:
 
@@ -133,7 +135,7 @@ def resumen_ventas(u=Depends(identidad)):
     with SessionLocal() as db:
 
         completadas, ingresos, pendientes, en_revision, fallidas = (
-            VentaRepository(db).resumen_por_usuario(u["usuario"]))
+            VentaRepository(db).resumen_por_usuario(ambito(u)))
 
         return {
             "completadas": completadas,
@@ -200,7 +202,7 @@ def listar_ventas(
     with SessionLocal() as db:
 
         ventas, total = VentaRepository(db).pagina_por_usuario(
-            u["usuario"], estado, limit, offset)
+            ambito(u), estado, limit, offset)
 
         return {
             "items": [service.salida(venta) for venta in ventas],
