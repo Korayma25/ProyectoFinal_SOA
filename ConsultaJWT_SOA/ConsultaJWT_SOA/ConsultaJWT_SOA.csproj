@@ -8,5 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="secrets.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('secrets.local.json')" />
+  </ItemGroup>
+
 </Project>
 
