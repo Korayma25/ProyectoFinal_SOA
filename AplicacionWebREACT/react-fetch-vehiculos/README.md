@@ -1,52 +1,32 @@
-# Cliente Web — React + Vite
+# react-fetch-vehiculos — Cliente web React + Vite
 
-**Autor:** Javier Vargas
+Cliente web de **consulta** (no registra ventas). Basado en el proyecto del taller de Javier Vargas y ampliado.
 
-## 1. Software necesario
+## Funciones
+- Login con usuario y contraseña; JWT solo en memoria.
+- Catálogo de vehículos **disponibles** (los vendidos no se muestran), filtro por marca y detalle completo.
+- Indicadores (`GET /api/ventas/resumen`), lista de ventas paginada con filtro por estado y seguimiento por venta.
+- Paneles según rol: CONSULTA solo el catálogo; OPERADOR y ADMIN también indicadores y ventas.
+- Estados de carga, listado vacío, errores HTTP y de conectividad (con «Reintentar»).
 
-- Windows 10 u 11 y Visual Studio Code.
-- Node.js 24 LTS con npm.
-- API Java Spring Boot en `http://127.0.0.1:8080`.
-- JWT válido para consultar el catálogo.
+## Requisitos
+Node.js 20+ y los servicios en ejecución (NGINX 8090, API Java, FastAPI).
 
-## 2. Preparar el proyecto
+## Configuración
+Copiar `.env.example` como `.env` (no se sube a Git): `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `API_BASE_URL` (por defecto `http://127.0.0.1:8090`). Esas variables solo las lee el servidor de Vite; no llegan al navegador.
 
-1. Se descarga o clona `soa-react` y se abre la carpeta que contiene `package.json`.
-2. Se verifica Node.js y npm:
+## Proxy de Vite (`vite.config.js`)
+- Todo sale hacia NGINX. `/oauth/token` agrega el cliente OAuth en el servidor.
+- `/api` solo permite `GET`: cualquier otro método responde 405.
 
-```powershell
-node -v
-npm -v
-```
-
-3. Se instalan las dependencias declaradas:
-
+## Ejecutar
 ```powershell
 npm ci
-```
-
-## 3. Compilar
-
-```powershell
+npm run dev        # http://localhost:5173
+npm test           # 30 pruebas
 npm run build
+npm run lint
 ```
 
-Los archivos listos para publicación quedan en `dist`.
-
-## 4. Ejecutar en desarrollo
-
-```powershell
-npm run dev
-```
-
-Se abre `http://localhost:5173` en el navegador. Vite reenvía `/api` hacia Java en el puerto `8080`.
-
-## 5. Comprobar
-
-1. Se obtiene un JWT válido desde el servicio Java.
-2. Se pega el token en la pantalla y se presiona **Consultar vehículos**.
-3. Se comprueba el listado, el filtro por marca y el detalle al seleccionar un vehículo.
-4. Para ver la compilación local se ejecuta `npm run preview` y se abre `http://localhost:4173`.
-5. Se detiene el servidor con `Ctrl + C`.
-
-> El proxy configurado por Vite corresponde a ejecución local; el despliegue en otro servidor requiere configurar el enrutamiento de `/api`.
+## Estructura
+`src/api` (clientes HTTP), `src/utils` (reglas de catálogo, ventas y permisos), `src/componentes/Ventas.jsx`, `tests/`.
