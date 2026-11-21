@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import ec.edu.uta.notificaciones.messaging.EventoVentaListener;
 import ec.edu.uta.notificaciones.repository.AvisoRepositorio;
+import org.springframework.dao.DataAccessResourceFailureException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ class EventoVentaListenerTest {
 
     @BeforeEach
     void preparar() {
-        repositorio = new AvisoRepositorio();
+        repositorio = new AvisoRepositorioMemoria();
         listener = new EventoVentaListener(new ObjectMapper(), repositorio);
         canal = mock(Channel.class);
     }
@@ -67,5 +68,23 @@ class EventoVentaListenerTest {
     void unMensajeQueNoEsJsonSeRechazaSinReencolar() throws Exception {
         listener.alRecibir(mensaje("no-es-json", 4), canal);
         verify(canal).basicReject(4L, false);
+    }
+
+    @Test
+    void siLaBaseDeDatosFallaElMensajeVuelveALaColaSinPerderse() throws Exception {
+        AvisoRepositorio caido = new AvisoRepositorio() {
+            @Override
+            public boolean registrar(ec.edu.uta.notificaciones.model.Aviso aviso) {
+                throw new DataAccessResourceFailureException("MySQL no disponible");
+            }
+
+            @Override
+            public java.util.List<ec.edu.uta.notificaciones.model.Aviso> historial() {
+                return java.util.List.of();
+            }
+        };
+        new EventoVentaListener(new ObjectMapper(), caido).alRecibir(mensaje(EVENTO, 5), canal);
+        verify(canal).basicNack(5L, false, true);
+        verify(canal, never()).basicAck(anyLong(), anyBoolean());
     }
 }

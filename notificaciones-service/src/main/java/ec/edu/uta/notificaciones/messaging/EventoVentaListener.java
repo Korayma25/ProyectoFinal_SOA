@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,6 +30,14 @@ public class EventoVentaListener {
     public EventoVentaListener(ObjectMapper mapper, AvisoRepositorio repositorio) {
         this.mapper = mapper;
         this.repositorio = repositorio;
+    }
+
+    private static void esperar(long milisegundos) {
+        try {
+            Thread.sleep(milisegundos);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @RabbitListener(queues = "${app.rabbit.cola-ventas}")
@@ -54,6 +63,11 @@ public class EventoVentaListener {
         } catch (IOException e) {
             log.warn("Mensaje no interpretable descartado: {}", e.getMessage());
             canal.basicReject(etiqueta, false);
+        } catch (DataAccessException e) {
+            // Base de datos no disponible: el mensaje NO se pierde, vuelve a la cola para reintentarlo.
+            log.error("No se pudo registrar el aviso en la base de datos; el mensaje vuelve a la cola: {}", e.getMessage());
+            esperar(2000);
+            canal.basicNack(etiqueta, false, true);
         }
     }
 }
