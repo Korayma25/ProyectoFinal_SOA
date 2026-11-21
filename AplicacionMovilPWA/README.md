@@ -1,39 +1,26 @@
-# AplicacionMovilPWA
+# AplicacionMovilPWA — PWA móvil de ventas
 
-PWA móvil (HTML/CSS/JavaScript, sin dependencias) para **iniciar sesión** y **registrar ventas** de vehículos. Es el único cliente del sistema con funcionalidad de venta.
+PWA (HTML/CSS/JavaScript, sin dependencias) para **iniciar sesión** y **registrar ventas**. Es el único cliente que vende.
+
+## Funciones
+- Login con usuario y contraseña (`POST /oauth/token`); el JWT vive solo en memoria.
+- Catálogo de vehículos disponibles, lista de vendidos y compradores para la venta.
+- Registro de venta (`POST /api/ventas` con `Authorization: Bearer` e `Idempotency-Key`) con resultado 201, 200 o 202.
+- Consulta del estado de una venta (`GET /api/ventas/{id}`), útil ante una respuesta incierta.
+- Funciones visibles según el rol (CONSULTA solo consulta). Instalable (manifiesto, íconos y service worker).
 
 ## Requisitos
-- Node.js 20 o superior.
-- NGINX (8090), API Java de vehículos (instancias A/B) y FastAPI de ventas en ejecución.
+Node.js 20+ y los servicios en ejecución (NGINX 8090, API Java, FastAPI).
 
-## Configuración (variables de entorno, no se guardan en el repositorio)
-| Variable | Descripción | Defecto |
-|---|---|---|
-| `OAUTH_CLIENT_ID` | Cliente OAuth de la API Java (obligatoria) | — |
-| `OAUTH_CLIENT_SECRET` | Secreto del cliente OAuth (obligatoria) | — |
-| `API_BASE_URL` | Punto de entrada REST (NGINX) | `http://127.0.0.1:8090` |
-| `OAUTH_IDAPLI` | Identificador de aplicación del login | `92` |
-| `PORT` | Puerto de la PWA | `5174` |
+## Configuración (`.env`, no se sube a Git)
+`OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_IDAPLI` (92), `API_BASE_URL` (por defecto `http://127.0.0.1:8090`), `PORT` (5174). El navegador solo envía usuario y contraseña; `server.mjs` agrega el cliente OAuth.
 
-El navegador solo envía usuario y contraseña; el servidor de la PWA agrega las credenciales del cliente OAuth. El JWT se conserva solo en memoria durante la sesión.
-
-## Ejecutar (PowerShell)
+## Ejecutar
 ```powershell
-$env:OAUTH_CLIENT_ID='<cliente>'; $env:OAUTH_CLIENT_SECRET='<secreto>'
-npm run dev
+npm run dev      # http://localhost:5174
+npm test         # 22 pruebas (cliente HTTP y servidor proxy)
+npm run build
 ```
-Abrir http://localhost:5174.
 
-## Flujo
-1. Login → `POST /oauth/token` (vía NGINX).
-2. Catálogo (`GET /api/vehiculos`) y compradores (`GET /api/compradores`).
-3. Selección de un vehículo DISPONIBLE y un comprador → `POST /api/ventas` con `Authorization: Bearer <JWT>` e `Idempotency-Key`.
-4. Resultado (201 nueva, 200 reintento, 202 pendiente) y consulta posterior `GET /api/ventas/{id}`.
-
-Ante un resultado incierto (fallo de red, 5xx) el reintento reutiliza la misma `Idempotency-Key`, por lo que no duplica la venta.
-
-## Pruebas y compilación
-```bash
-npm test        # 20 pruebas (cliente HTTP y servidor proxy)
-npm run build   # publica los archivos estáticos en dist/
-```
+## Notas
+Si cambia el cliente OAuth de Java, actualice el `.env` y reinicie la PWA. Instalable solo en `localhost` o HTTPS.

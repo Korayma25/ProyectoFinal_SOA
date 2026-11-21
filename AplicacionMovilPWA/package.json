@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Aplicación móvil PWA para consultar vehículos de Spring Boot con JWT",
   "scripts": {
-    "dev": "node server.mjs",
-    "start": "node server.mjs",
+    "dev": "node --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test tests/*.test.mjs",
     "build": "node scripts/build.mjs",
     "preview": "node server.mjs --dir=dist --port=4173"

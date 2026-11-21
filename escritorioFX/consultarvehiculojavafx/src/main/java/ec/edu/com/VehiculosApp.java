@@ -13,6 +13,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -39,6 +41,7 @@ public final class VehiculosApp extends Application {
             new Label("Ingrese un JWT para realizar la consulta.");
     private final Label lblTotal = new Label("Total de vehículos: 0");
     private final TableView<Vehiculo> tabla = new TableView<>();
+    private PanelNotificaciones panelNotificaciones;
 
     @Override
     public void start(Stage ventana) {
@@ -72,9 +75,24 @@ public final class VehiculosApp extends Application {
         contenido.setPadding(new Insets(22));
         contenido.setStyle("-fx-background-color: white;");
 
-        ventana.setScene(new Scene(contenido, 1024, 650));
+        // Pestaña 1: consulta de vehículos (existente). Pestaña 2: notificaciones de venta (Actividad 9).
+        Tab pestanaVehiculos = new Tab("Vehículos", contenido);
+        pestanaVehiculos.setClosable(false);
+        panelNotificaciones = new PanelNotificaciones(
+                new NotificacionesApiClient(ConfigNotificaciones.urlBase(), ConfigNotificaciones.clave()));
+        Tab pestanaNotificaciones = new Tab("Notificaciones", panelNotificaciones);
+        pestanaNotificaciones.setClosable(false);
+        ventana.setScene(new Scene(new TabPane(pestanaVehiculos, pestanaNotificaciones), 1024, 650));
+        panelNotificaciones.iniciar();   // sondeo automático cada 4 segundos
         ventana.setTitle("Consulta de vehículos");
         ventana.show();
+    }
+
+    @Override
+    public void stop() {
+        if (panelNotificaciones != null) {
+            panelNotificaciones.detener();
+        }
     }
 
     private void configurarTabla() {

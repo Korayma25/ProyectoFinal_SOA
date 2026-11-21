@@ -145,3 +145,42 @@ export async function consultarVenta(entradaToken, id, ejecutarFetch = fetch) {
   if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
   return { codigoHttp: respuesta.status, venta: await leerJson(respuesta) };
 }
+
+/**
+ * Permisos de la interfaz por rol, alineados con los backends:
+ *  - CONSULTA: solo lectura de vehículos (ventas y compradores responden 403).
+ *  - OPERADOR y ADMIN: además registran y consultan ventas.
+ * Es solo presentación: la autorización real la sigue aplicando el backend.
+ */
+const FUNCIONES = {
+  verDisponibles: 'Ver vehículos disponibles',
+  verVendidos: 'Ver vehículos vendidos',
+  registrarVenta: 'Registrar venta',
+  consultarVenta: 'Consultar estado de una venta',
+};
+const PERMISOS_ROL = {
+  CONSULTA: ['verDisponibles', 'verVendidos'],
+  OPERADOR: ['verDisponibles', 'verVendidos', 'registrarVenta', 'consultarVenta'],
+  ADMIN: ['verDisponibles', 'verVendidos', 'registrarVenta', 'consultarVenta'],
+};
+
+/** Lee el claim "rol" del JWT (solo para la interfaz; no valida la firma). */
+export function rolDeJwt(jwt = '') {
+  try {
+    const carga = String(jwt).split('.')[1];
+    const base64 = carga.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(carga.length / 4) * 4, '=');
+    const rol = JSON.parse(atob(base64)).rol;
+    return typeof rol === 'string' ? rol.replace(/^ROLE_/, '').toUpperCase() : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Funciones permitidas para un rol. Un rol desconocido recibe solo lectura. */
+export function funcionesDelRol(rol) {
+  const claves = PERMISOS_ROL[rol] || PERMISOS_ROL.CONSULTA;
+  return {
+    permisos: new Set(claves),
+    etiquetas: claves.map((clave) => FUNCIONES[clave]),
+  };
+}

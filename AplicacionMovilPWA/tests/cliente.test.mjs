@@ -112,3 +112,26 @@ test('informa error de conectividad', async () => {
     /conectar/,
   );
 });
+
+import { rolDeJwt, funcionesDelRol } from '../public/api.js';
+
+function jwtConRol(rol) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64({ alg: 'HS256' })}.${b64({ sub: 'u', rol })}.firma`;
+}
+
+test('rolDeJwt lee el claim rol y tolera tokens inválidos', () => {
+  assert.equal(rolDeJwt(jwtConRol('ADMIN')), 'ADMIN');
+  assert.equal(rolDeJwt(jwtConRol('ROLE_consulta')), 'CONSULTA');
+  assert.equal(rolDeJwt('basura'), '');
+  assert.equal(rolDeJwt(''), '');
+});
+
+test('funcionesDelRol: CONSULTA solo lee; OPERADOR y ADMIN también venden', () => {
+  assert.deepEqual([...funcionesDelRol('CONSULTA').permisos], ['verDisponibles', 'verVendidos']);
+  for (const rol of ['OPERADOR', 'ADMIN']) {
+    const { permisos } = funcionesDelRol(rol);
+    assert.ok(permisos.has('registrarVenta') && permisos.has('consultarVenta'), rol);
+  }
+  assert.ok(!funcionesDelRol('DESCONOCIDO').permisos.has('registrarVenta'));
+});
