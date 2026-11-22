@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor de balanceo</title>
+<style>
+:root{--bg:#f5f6f8;--fg:#1c1f24;--card:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#e8eaed;--card:#20242a}}
+body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:var(--bg);color:var(--fg)}
+h1{font-size:1.3rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--card);border-radius:8px;padding:12px;box-shadow:0 1px 3px #0002;overflow-x:auto}
+.UP{color:#1a7f37;font-weight:700}.DOWN{color:#c62828;font-weight:700}
+table{border-collapse:collapse;width:100%}td,th{padding:4px 8px;text-align:left;border-bottom:1px solid #8884;font-size:.9rem}
+small{opacity:.7}
+</style></head><body>
+<h1>Monitor de balanceo NGINX <small id="g"></small></h1>
+<div class="grid" id="comp"></div>
+<h2>Reparto (access.log)</h2><div class="card" id="est"></div>
+<h2>Alertas</h2><div class="card"><table id="al"></table></div>
+<script>
+const j=u=>fetch(u).then(r=>r.json());
+async function tick(){
+ try{
+  const e=await j('/api/monitor/estado');
+  g.textContent='— '+e.global;
+  comp.innerHTML=e.componentes.map(c=>`<div class="card"><b>${c.nombre}</b><br><span class="${c.estado}">${c.estado}</span>
+   <br><small>HTTP ${c.httpStatus??'-'} · ${c.latenciaMs} ms · fallos ${c.fallosConsecutivos}</small></div>`).join('');
+  const s=await j('/api/monitor/estadisticas');
+  est.innerHTML=s.disponible?`Peticiones ${s.ruta}: <b>${s.totalPeticiones}</b> · reintentos: ${s.reintentosEntreInstancias} · tiempo medio ${s.tiempoMedioMs} ms<br>`+
+   Object.entries(s.porBackend).map(([k,v])=>`${k}: ${v} (${s.porcentajePorBackend[k]})`).join(' · '):s.mensaje;
+  const a=await j('/api/monitor/alertas');
+  al.innerHTML='<tr><th>Fecha</th><th>Componente</th><th>Tipo</th><th>Mensaje</th></tr>'+
+   a.slice(0,20).map(x=>`<tr><td>${new Date(x.fecha).toLocaleString()}</td><td>${x.componente}</td><td>${x.tipo}</td><td>${x.mensaje}</td></tr>`).join('');
+ }catch(err){g.textContent='— sin conexión con el monitor'}
+}
+tick();setInterval(tick,3000);
+</script></body></html>
